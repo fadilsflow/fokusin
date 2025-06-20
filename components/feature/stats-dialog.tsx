@@ -13,8 +13,20 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
+const ITEMS_PER_PAGE = 25;
 
 type UserStats = {
   id: string;
@@ -33,20 +45,26 @@ type ActivitySummary = {
   avatarUrl: string | null;
 };
 
-// API fetching functions
+// API fetching functions with error handling
 const fetchSummary = async (): Promise<ActivitySummary> => {
-  const res = await fetch("/api/stats?type=summary", {
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Failed to fetch summary");
+  const res = await fetch("/api/stats/summary");
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Failed to fetch summary");
+  }
   return res.json();
 };
 
-const fetchRankings = async (): Promise<UserStats[]> => {
-  const res = await fetch("/api/stats?type=rankings", {
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Failed to fetch rankings");
+const fetchRankings = async (
+  page: number
+): Promise<{ users: UserStats[]; total: number }> => {
+  const res = await fetch(
+    `/api/stats/rankings?page=${page}&limit=${ITEMS_PER_PAGE}`
+  );
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Failed to fetch rankings");
+  }
   return res.json();
 };
 
@@ -78,7 +96,7 @@ const StatsSkeleton = () => (
 
 const RankingSkeleton = () => (
   <div className="space-y-4">
-    {[...Array(3)].map((_, i) => (
+    {[...Array(12)].map((_, i) => (
       <div
         key={i}
         className="flex items-center gap-4 p-4 rounded-lg bg-background/5"
@@ -97,21 +115,31 @@ const RankingSkeleton = () => (
 
 export function StatsDialog() {
   const [open, setOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const { isSignedIn, isLoaded } = useAuth();
 
   // Use React Query for data fetching with caching
-  const { data: summary, isLoading: summaryLoading } = useQuery({
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    error: summaryError,
+  } = useQuery({
     queryKey: ["stats", "summary"],
     queryFn: fetchSummary,
-    enabled: open, // Only fetch when dialog is open
-    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    enabled: open && isSignedIn,
+    staleTime: 1000 * 60 * 5,
     retry: 2,
   });
 
-  const { data: rankings, isLoading: rankingsLoading } = useQuery({
-    queryKey: ["stats", "rankings"],
-    queryFn: fetchRankings,
-    enabled: open, // Only fetch when dialog is open
-    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+  const {
+    data: rankingsData,
+    isLoading: rankingsLoading,
+    error: rankingsError,
+  } = useQuery({
+    queryKey: ["stats", "rankings", currentPage],
+    queryFn: () => fetchRankings(currentPage),
+    enabled: open && isSignedIn,
+    staleTime: 1000 * 60 * 5,
     retry: 2,
   });
 
@@ -121,6 +149,18 @@ export function StatsDialog() {
     return `${hours}h ${minutes}m`;
   };
 
+  const totalPages = rankingsData
+    ? Math.ceil(rankingsData.total / ITEMS_PER_PAGE)
+    : 0;
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  if (!isLoaded) {
+    return null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -128,112 +168,164 @@ export function StatsDialog() {
           <BarChart className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold mb-4">
             Statistics
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="summary" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="summary">Activity Summary</TabsTrigger>
-            <TabsTrigger value="rankings">Rankings</TabsTrigger>
-          </TabsList>
+        {!isSignedIn ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Please sign in to view your statistics
+          </div>
+        ) : (
+          <Tabs defaultValue="summary" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="summary">Activity Summary</TabsTrigger>
+              <TabsTrigger value="rankings">Rankings</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="summary" className="space-y-4 mt-4">
-            {summaryLoading ? (
-              <StatsSkeleton />
-            ) : summary ? (
-              <>
-                <div className="flex items-center gap-4 mb-6">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={summary.avatarUrl ?? undefined} />
-                    <AvatarFallback>
-                      {summary.username?.[0]?.toUpperCase() ?? "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h3 className="font-medium">{summary.username}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Last active{" "}
-                      {formatDistanceToNow(new Date(summary.lastActive), {
-                        addSuffix: true,
-                      })}
-                    </p>
-                  </div>
+            <TabsContent value="summary" className="space-y-4 mt-4">
+              {summaryLoading ? (
+                <StatsSkeleton />
+              ) : summaryError ? (
+                <div className="text-center py-8 text-red-500">
+                  Failed to load summary
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2 p-4 rounded-lg bg-background/5">
-                    <h4 className="text-sm font-medium text-muted-foreground">
-                      Hours Focused
-                    </h4>
-                    <p className="text-2xl font-bold">
-                      {Math.floor(summary.hoursSpent)}
-                    </p>
-                  </div>
-                  <div className="space-y-2 p-4 rounded-lg bg-background/5">
-                    <h4 className="text-sm font-medium text-muted-foreground">
-                      Days Accessed
-                    </h4>
-                    <p className="text-2xl font-bold">{summary.daysAccessed}</p>
-                  </div>
-                  <div className="space-y-2 p-4 rounded-lg bg-background/5">
-                    <h4 className="text-sm font-medium text-muted-foreground">
-                      Current Streak
-                    </h4>
-                    <p className="text-2xl font-bold">
-                      {summary.currentStreak} days
-                    </p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No stats available
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="rankings" className="mt-4">
-            {rankingsLoading ? (
-              <RankingSkeleton />
-            ) : rankings?.length ? (
-              <div className="space-y-4">
-                {rankings.map((user, index) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center gap-4 p-4 rounded-lg bg-background/5"
-                  >
-                    <div className="flex-shrink-0 w-8 text-center font-bold">
-                      #{index + 1}
-                    </div>
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.avatarUrl ?? undefined} />
+              ) : summary ? (
+                <>
+                  <div className="flex items-center gap-4 mb-6">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={summary.avatarUrl ?? undefined} />
                       <AvatarFallback>
-                        {user.username?.[0]?.toUpperCase() ?? "?"}
+                        {summary.username?.[0]?.toUpperCase() ?? "?"}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-grow">
-                      <p className="font-medium">{user.username}</p>
+                    <div>
+                      <h3 className="font-medium">{summary.username}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {formatTime(user.totalFocusTime)}
+                        Last active{" "}
+                        {formatDistanceToNow(new Date(summary.lastActive), {
+                          addSuffix: true,
+                        })}
                       </p>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      {user.streak} day streak
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2 p-4 rounded-lg bg-background/5">
+                      <h4 className="text-sm font-medium text-muted-foreground">
+                        Hours Focused
+                      </h4>
+                      <p className="text-2xl font-bold">
+                        {summary.hoursSpent.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="space-y-2 p-4 rounded-lg bg-background/5">
+                      <h4 className="text-sm font-medium text-muted-foreground">
+                        Days Accessed
+                      </h4>
+                      <p className="text-2xl font-bold">
+                        {summary.daysAccessed}
+                      </p>
+                    </div>
+                    <div className="space-y-2 p-4 rounded-lg bg-background/5">
+                      <h4 className="text-sm font-medium text-muted-foreground">
+                        Current Streak
+                      </h4>
+                      <p className="text-2xl font-bold">
+                        {summary.currentStreak} days
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No rankings available
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No stats available
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="rankings" className="mt-4">
+              {rankingsLoading ? (
+                <RankingSkeleton />
+              ) : rankingsError ? (
+                <div className="text-center py-8 text-red-500">
+                  Failed to load rankings
+                </div>
+              ) : rankingsData?.users && rankingsData.users.length > 0 ? (
+                <>
+                  <ScrollArea className="h-[600px] pr-4">
+                    <div className="space-y-4">
+                      {rankingsData.users.map((user, index) => (
+                        <div
+                          key={user.id}
+                          className="flex items-center gap-4 p-4 rounded-lg bg-background/5"
+                        >
+                          <span className="w-6 text-center font-medium">
+                            #{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
+                          </span>
+                          <Avatar>
+                            <AvatarImage src={user.avatarUrl ?? undefined} />
+                            <AvatarFallback>
+                              {user.username[0].toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-grow">
+                            <h4 className="font-medium">{user.username}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {formatTime(user.totalFocusTime)}
+                            </p>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {user.streak} days
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  <div className="mt-4 flex justify-center">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() =>
+                              currentPage > 1 &&
+                              handlePageChange(currentPage - 1)
+                            }
+                          />
+                        </PaginationItem>
+                        {[...Array(totalPages)].map((_, i) => (
+                          <PaginationItem key={i + 1}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(i + 1)}
+                              isActive={currentPage === i + 1}
+                            >
+                              {i + 1}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() =>
+                              currentPage < totalPages &&
+                              handlePageChange(currentPage + 1)
+                            }
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No rankings available
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -67,7 +67,6 @@ type SettingsForm = typeof DEFAULTS;
 
 export function SettingsDialog() {
   const [open, setOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { settings, updateSettings } = useTimerStore();
 
   // Local state for form fields
@@ -83,21 +82,31 @@ export function SettingsDialog() {
     null | "pomodoro" | "shortBreak" | "longBreak"
   >(null);
 
-  const { userId } = useAuth();
-  useEffect(() => {
-    const checkAuth = async () => {
-      setIsLoggedIn(!!userId);
-    };
-    checkAuth();
-  }, []);
+  const { userId, isSignedIn, isLoaded } = useAuth();
 
-  // Sync local form state with store on open
+  // Load settings from API when dialog opens
   useEffect(() => {
+    const loadSettings = async () => {
+      if (isLoaded && isSignedIn) {
+        try {
+          const response = await fetch("/api/settings");
+          if (response.ok) {
+            const data = await response.json();
+            if (data) {
+              setForm(data);
+              updateSettings(data);
+            }
+          }
+        } catch (error) {
+          console.error("Error loading settings:", error);
+        }
+      }
+    };
+
     if (open) {
-      setForm({ ...settings });
-      setIsDirty(false);
+      loadSettings();
     }
-  }, [open, settings]);
+  }, [open, isLoaded, isSignedIn, updateSettings]);
 
   // Validation helpers
   const clamp = (val: string | number) => {
@@ -149,16 +158,28 @@ export function SettingsDialog() {
     setForm((f) => ({ ...f, [field]: value }));
     setIsDirty(true);
   };
-  const handleOpenChange = (newOpen: boolean) => {
+  const handleOpenChange = async (newOpen: boolean) => {
     setOpen(newOpen);
-    if (!newOpen && isLoggedIn && allValid && isDirty) {
+    if (!newOpen && isSignedIn && allValid && isDirty) {
+      // Update local state first
       updateSettings({ ...form });
-      fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      }).catch(() => {});
+
+      try {
+        // Then save to server
+        const response = await fetch("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save settings");
+        }
+      } catch (error) {
+        console.error("Error saving settings:", error);
+      }
     } else if (!newOpen && allValid && isDirty) {
+      // Just update local state if not signed in
       updateSettings({ ...form });
     }
   };

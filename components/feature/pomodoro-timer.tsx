@@ -192,7 +192,7 @@ export function PomodoroTimer() {
         const initialTime = settings.pomodoroTime * 60;
         const focusTime = initialTime - timeLeft;
         // Send focus time, but don't wait for it
-        fetch("/api/stats", {
+        fetch("/api/stats/track", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ focusTime }),
@@ -279,7 +279,7 @@ export function PomodoroTimer() {
       const initialTime = settings.pomodoroTime * 60;
       const focusTime = initialTime;
 
-      fetch("/api/stats", {
+      fetch("/api/stats/track", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ focusTime }),

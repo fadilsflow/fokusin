@@ -46,3 +46,15 @@ model Settings {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @default(now())
 }
+
+model Profile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  fullName  String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("profiles")
+}

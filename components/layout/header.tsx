@@ -9,6 +9,13 @@ import {
   SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
+import { createOrUpdateProfile } from "@/app/actions/profile";
+import { Suspense } from "react";
+
+async function ProfileInitializer() {
+  await createOrUpdateProfile();
+  return null;
+}
 
 export default async function Header() {
   return (
@@ -16,10 +23,13 @@ export default async function Header() {
       <div className="justify-between flex w-full">
         <h1 className="text-2xl font-bold text-background">Focus</h1>
         <div className="flex items-center gap-2">
-          <UserButton />
           <SignedIn>
+            <Suspense fallback={null}>
+              <ProfileInitializer />
+            </Suspense>
             <SettingsDialog />
             <KeyboardShortcuts />
+            <UserButton />
             <StatsDialog />
           </SignedIn>
           <SignedOut>
@@ -27,8 +37,8 @@ export default async function Header() {
             <SignUpButton mode="modal" />
           </SignedOut>
         </div>
-        <ProgressTimer />
       </div>
+      <ProgressTimer />
     </nav>
   );
 }
