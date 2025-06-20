@@ -1,0 +1,48 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Stats {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  focusTime Int      @default(0) // in seconds
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+model Settings {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  pomodoroTime       Int      @default(25)
+  shortBreakTime     Int      @default(5)
+  longBreakTime      Int      @default(15)
+  autoStartBreaks    Boolean  @default(false)
+  autoStartPomodoros Boolean  @default(false)
+  longBreakInterval  Int      @default(4)
+  pomodoroColor      String   @default("oklch(0.3635 0.0554 277.8)")
+  shortBreakColor    String   @default("oklch(0.5406 0.067 196.69)")
+  longBreakColor     String   @default("oklch(0.4703 0.0888 247.87)")
+  alarmRepeat        Int      @default(1)
+  volume             Float    @default(1)
+  alarmSound         String   @default("alarm-bell.mp3")
+  backsound          String   @default("")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now())
+}
