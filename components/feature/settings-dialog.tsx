@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ import {
   DialogTitle as ShadDialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@clerk/nextjs";
+import { ScrollArea } from "../ui/scroll-area";
 
 const COLOR_OPTIONS = [
   { name: "Deep Indigo", value: "oklch(0.3635 0.0554 277.8)" },
@@ -67,7 +68,7 @@ type SettingsForm = typeof DEFAULTS;
 
 export function SettingsDialog() {
   const [open, setOpen] = useState(false);
-  const { settings, updateSettings } = useTimerStore();
+  const { updateSettings } = useTimerStore();
 
   // Local state for form fields
   const [form, setForm] = useState<SettingsForm>({ ...DEFAULTS });
@@ -82,7 +83,7 @@ export function SettingsDialog() {
     null | "pomodoro" | "shortBreak" | "longBreak"
   >(null);
 
-  const { userId, isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
 
   // Load settings from API when dialog opens
   useEffect(() => {
@@ -154,10 +155,6 @@ export function SettingsDialog() {
     setForm((f) => ({ ...f, [field]: value }));
     setIsDirty(true);
   };
-  const handleColorChange = (field: keyof typeof DEFAULTS, value: string) => {
-    setForm((f) => ({ ...f, [field]: value }));
-    setIsDirty(true);
-  };
   const handleOpenChange = async (newOpen: boolean) => {
     setOpen(newOpen);
     if (!newOpen && isSignedIn && allValid && isDirty) {
@@ -195,7 +192,7 @@ export function SettingsDialog() {
   const handleColorPick = (color: string) => {
     if (!colorPickerMode) return;
 
-    let newSettings = { ...form };
+    const newSettings = { ...form };
     if (colorPickerMode === "pomodoro") newSettings.pomodoroColor = color;
     if (colorPickerMode === "shortBreak") newSettings.shortBreakColor = color;
     if (colorPickerMode === "longBreak") newSettings.longBreakColor = color;
@@ -214,26 +211,29 @@ export function SettingsDialog() {
   };
 
   // Sound preview handler
-  const previewSound = (type: "alarm" | "backsound", file: string) => {
-    // Stop any existing preview
-    if (previewAudio) {
-      previewAudio.pause();
-      previewAudio.remove();
-    }
+  const previewSound = useCallback(
+    (type: "alarm" | "backsound", file: string) => {
+      // Stop any existing preview
+      if (previewAudio) {
+        previewAudio.pause();
+        previewAudio.remove();
+      }
 
-    // Don't preview if "None" is selected
-    if (!file) return;
+      // Don't preview if "None" is selected
+      if (!file) return;
 
-    const audio = new Audio(`sounds/${type}/${file}`);
-    audio.volume = form.volume ?? 1;
-    setPreviewAudio(audio);
-    audio.play().catch(() => {});
-    setTimeout(() => {
-      audio.pause();
-      audio.remove();
-      setPreviewAudio(null);
-    }, 2000);
-  };
+      const audio = new Audio(`sounds/${type}/${file}`);
+      audio.volume = form.volume ?? 1;
+      setPreviewAudio(audio);
+      audio.play().catch(() => {});
+      setTimeout(() => {
+        audio.pause();
+        audio.remove();
+        setPreviewAudio(null);
+      }, 2000);
+    },
+    [previewAudio, form.volume]
+  );
 
   // Volume change handler with preview
   const handleVolumeChange = (value: number) => {
@@ -248,27 +248,23 @@ export function SettingsDialog() {
     if (!previewAudio) {
       const audio = new Audio("sounds/button-press.wav");
       audio.volume = newVolume;
-      setPreviewAudio(audio);
       audio.play().catch(() => {});
-      setTimeout(() => {
-        audio.pause();
+      // Clean up the audio element after it finishes playing
+      audio.onended = () => {
         audio.remove();
-        setPreviewAudio(null);
-      }, 200);
-    } else {
-      previewAudio.volume = newVolume;
+      };
     }
   };
 
-  // Cleanup audio on unmount
   useEffect(() => {
+    // Cleanup the preview audio on component unmount
     return () => {
       if (previewAudio) {
         previewAudio.pause();
         previewAudio.remove();
       }
     };
-  }, []);
+  }, [previewAudio]);
 
   // Sound change handler
   const handleSoundChange = (
@@ -283,261 +279,262 @@ export function SettingsDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="default" size="icon">
+        <Button variant="outline" size="icon">
           <Settings className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="overflow-visible p-6 max-h-[80vh] overflow-y-auto w-xl md:w-md">
+      <DialogContent className=" p-6  w-xl md:w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Settings</DialogTitle>
         </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Color Theme Section */}
-          <div className="flex justify-between w-full  space-y-4">
-            <h3 className="text-base font-semibold">Color Themes</h3>
-            <div className="flex  gap-4">
-              <button
-                className="w-8 h-8 rounded-md border border-background/30 focus:outline-none focus:ring-2 focus:ring-primary/60"
-                style={{ backgroundColor: form.pomodoroColor }}
-                onClick={() => openColorPicker("pomodoro")}
-                title="Pomodoro Color"
-              />
-              <button
-                className="w-8 h-8 rounded-md border border-background/30 focus:outline-none focus:ring-2 focus:ring-primary/60"
-                style={{ backgroundColor: form.shortBreakColor }}
-                onClick={() => openColorPicker("shortBreak")}
-                title="Short Break Color"
-              />
-              <button
-                className="w-8 h-8 rounded-md border border-background/30 focus:outline-none focus:ring-2 focus:ring-primary/60"
-                style={{ backgroundColor: form.longBreakColor }}
-                onClick={() => openColorPicker("longBreak")}
-                title="Long Break Color"
-              />
-            </div>
-          </div>
-
-          {/* Timer Settings Section */}
-          <div className="space-y-4">
-            <h3 className="text-base font-semibold">Timer</h3>
-            <div className="flex gap-4 justify-between w-full ">
-              <div className="space-y-2">
-                <Label htmlFor="pomodoro" className="text-sm">
-                  Pomodoro
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="pomodoro"
-                    type="number"
-                    min={1}
-                    max={999}
-                    value={form.pomodoroTime}
-                    onChange={(e) =>
-                      handleTimeChange("pomodoroTime", e.target.value)
-                    }
-                    onBlur={() => handleTimeBlur("pomodoroTime")}
-                    className="w-25 bg-background/50"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="shortBreak" className="text-sm">
-                  Short Break
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="shortBreak"
-                    type="number"
-                    min={1}
-                    max={999}
-                    value={form.shortBreakTime}
-                    onChange={(e) =>
-                      handleTimeChange("shortBreakTime", e.target.value)
-                    }
-                    onBlur={() => handleTimeBlur("shortBreakTime")}
-                    className="w-25 bg-background/50"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="longBreak" className="text-sm">
-                  Long Break
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="longBreak"
-                    type="number"
-                    min={1}
-                    max={999}
-                    value={form.longBreakTime}
-                    onChange={(e) =>
-                      handleTimeChange("longBreakTime", e.target.value)
-                    }
-                    onBlur={() => handleTimeBlur("longBreakTime")}
-                    className="w-25 bg-background/50"
-                  />
-                </div>
+        <ScrollArea className="h-[450px]">
+          <div className="space-y-6">
+            {/* Color Theme Section */}
+            <div className="flex justify-between w-full  space-y-4">
+              <h3 className="text-base font-semibold">Color Themes</h3>
+              <div className="flex  gap-4">
+                <button
+                  className="w-8 h-8 rounded-md border border-background/30 focus:outline-none focus:ring-2 focus:ring-primary/60"
+                  style={{ backgroundColor: form.pomodoroColor }}
+                  onClick={() => openColorPicker("pomodoro")}
+                  title="Pomodoro Color"
+                />
+                <button
+                  className="w-8 h-8 rounded-md border border-background/30 focus:outline-none focus:ring-2 focus:ring-primary/60"
+                  style={{ backgroundColor: form.shortBreakColor }}
+                  onClick={() => openColorPicker("shortBreak")}
+                  title="Short Break Color"
+                />
+                <button
+                  className="w-8 h-8 rounded-md border border-background/30 focus:outline-none focus:ring-2 focus:ring-primary/60"
+                  style={{ backgroundColor: form.longBreakColor }}
+                  onClick={() => openColorPicker("longBreak")}
+                  title="Long Break Color"
+                />
               </div>
             </div>
-          </div>
 
-          {/* Auto Start Section */}
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="autoStartBreaks" className="text-sm">
-                  Auto Start Breaks
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Automatically start break timers
-                </p>
-              </div>
-              <Switch
-                id="autoStartBreaks"
-                checked={form.autoStartBreaks}
-                onCheckedChange={(checked) =>
-                  handleSwitchChange("autoStartBreaks", checked)
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between ">
-              <div className="space-y-0.5">
-                <Label htmlFor="autoStartPomodoros" className="text-sm">
-                  Auto Start Pomodoros
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Automatically start pomodoro timers
-                </p>
-              </div>
-              <Switch
-                id="autoStartPomodoros"
-                checked={form.autoStartPomodoros}
-                onCheckedChange={(checked) =>
-                  handleSwitchChange("autoStartPomodoros", checked)
-                }
-              />
-            </div>
-          </div>
-          <div className=" flex justify-between w-full ">
-            <Label htmlFor="longBreakInterval" className="text-sm ">
-              Long Break Interval (Pomodoros)
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="longBreakInterval"
-                type="number"
-                min={1}
-                max={999}
-                value={form.longBreakInterval}
-                onChange={(e) =>
-                  handleTimeChange("longBreakInterval", e.target.value)
-                }
-                onBlur={() => handleTimeBlur("longBreakInterval")}
-                className="w-20 bg-background/50"
-              />
-            </div>
-          </div>
-
-          {/* Sound Settings Section */}
-          <div className="space-y-4">
-            <h3 className="text-base font-semibold">Sound</h3>
+            {/* Timer Settings Section */}
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="volume" className="text-sm mb-2 block">
-                  Volume
-                </Label>
-                <div className="flex items-center gap-4 w-full justify-center">
-                  <Slider
-                    id="volume"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={[Math.round((form.volume ?? 1) * 100)]}
-                    onValueChange={([v]) => handleVolumeChange(v)}
-                    className="w-full"
-                  />
-                  <span className="text-sm w-8 text-right">
-                    {Math.round((form.volume ?? 1) * 100)}%
-                  </span>
+              <h3 className="text-base font-semibold">Timer</h3>
+              <div className="flex gap-4 justify-between w-full ">
+                <div className="space-y-2">
+                  <Label htmlFor="pomodoro" className="text-sm">
+                    Pomodoro
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="pomodoro"
+                      type="number"
+                      min={1}
+                      max={999}
+                      value={form.pomodoroTime}
+                      onChange={(e) =>
+                        handleTimeChange("pomodoroTime", e.target.value)
+                      }
+                      onBlur={() => handleTimeBlur("pomodoroTime")}
+                      className="w-25 bg-background/50"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="shortBreak" className="text-sm">
+                    Short Break
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="shortBreak"
+                      type="number"
+                      min={1}
+                      max={999}
+                      value={form.shortBreakTime}
+                      onChange={(e) =>
+                        handleTimeChange("shortBreakTime", e.target.value)
+                      }
+                      onBlur={() => handleTimeBlur("shortBreakTime")}
+                      className="w-25 bg-background/50"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="longBreak" className="text-sm">
+                    Long Break
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="longBreak"
+                      type="number"
+                      min={1}
+                      max={999}
+                      value={form.longBreakTime}
+                      onChange={(e) =>
+                        handleTimeChange("longBreakTime", e.target.value)
+                      }
+                      onBlur={() => handleTimeBlur("longBreakTime")}
+                      className="w-25 bg-background/50"
+                    />
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
+            {/* Auto Start Section */}
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="autoStartBreaks" className="text-sm">
+                    Auto Start Breaks
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically start break timers
+                  </p>
+                </div>
+                <Switch
+                  id="autoStartBreaks"
+                  checked={form.autoStartBreaks}
+                  onCheckedChange={(checked) =>
+                    handleSwitchChange("autoStartBreaks", checked)
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between ">
+                <div className="space-y-0.5">
+                  <Label htmlFor="autoStartPomodoros" className="text-sm">
+                    Auto Start Pomodoros
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically start pomodoro timers
+                  </p>
+                </div>
+                <Switch
+                  id="autoStartPomodoros"
+                  checked={form.autoStartPomodoros}
+                  onCheckedChange={(checked) =>
+                    handleSwitchChange("autoStartPomodoros", checked)
+                  }
+                />
+              </div>
+            </div>
+            <div className=" flex justify-between w-full ">
+              <Label htmlFor="longBreakInterval" className="text-sm ">
+                Long Break Interval (Pomodoros)
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="longBreakInterval"
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={form.longBreakInterval}
+                  onChange={(e) =>
+                    handleTimeChange("longBreakInterval", e.target.value)
+                  }
+                  onBlur={() => handleTimeBlur("longBreakInterval")}
+                  className="w-20 bg-background/50"
+                />
+              </div>
+            </div>
+
+            {/* Sound Settings Section */}
+            <div className="space-y-4">
+              <h3 className="text-base font-semibold">Sound</h3>
+              <div className="space-y-4">
                 <div>
-                  <Label htmlFor="alarmSound" className="text-sm mb-2 block">
-                    Alarm Sound
+                  <Label htmlFor="volume" className="text-sm mb-2 block">
+                    Volume
+                  </Label>
+                  <div className="flex items-center gap-4 w-full justify-center">
+                    <Slider
+                      id="volume"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={[Math.round((form.volume ?? 1) * 100)]}
+                      onValueChange={([v]) => handleVolumeChange(v)}
+                      className="w-full"
+                    />
+                    <span className="text-sm w-8 text-right">
+                      {Math.round((form.volume ?? 1) * 100)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="alarmSound" className="text-sm mb-2 block">
+                      Alarm Sound
+                    </Label>
+                    <select
+                      id="alarmSound"
+                      className="w-full rounded border bg-background/50 p-2 text-sm"
+                      value={form.alarmSound}
+                      onChange={(e) =>
+                        handleSoundChange("alarmSound", e.target.value)
+                      }
+                    >
+                      {ALARM_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="alarmRepeat" className="text-sm mb-2 block">
+                      Alarm Repeat
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="alarmRepeat"
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={form.alarmRepeat}
+                        onChange={(e) =>
+                          handleTimeChange("alarmRepeat", e.target.value)
+                        }
+                        onBlur={() => handleTimeBlur("alarmRepeat")}
+                        className="w-20 bg-background/50"
+                      />
+                      <span className="text-sm">times</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="backsound" className="text-sm mb-2 block">
+                    Backsound
                   </Label>
                   <select
-                    id="alarmSound"
+                    id="backsound"
                     className="w-full rounded border bg-background/50 p-2 text-sm"
-                    value={form.alarmSound}
+                    value={form.backsound}
                     onChange={(e) =>
-                      handleSoundChange("alarmSound", e.target.value)
+                      handleSoundChange("backsound", e.target.value)
                     }
                   >
-                    {ALARM_OPTIONS.map((opt) => (
+                    {BACKSOUND_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <Label htmlFor="alarmRepeat" className="text-sm mb-2 block">
-                    Alarm Repeat
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="alarmRepeat"
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={form.alarmRepeat}
-                      onChange={(e) =>
-                        handleTimeChange("alarmRepeat", e.target.value)
-                      }
-                      onBlur={() => handleTimeBlur("alarmRepeat")}
-                      className="w-20 bg-background/50"
-                    />
-                    <span className="text-sm">times</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="backsound" className="text-sm mb-2 block">
-                  Backsound
-                </Label>
-                <select
-                  id="backsound"
-                  className="w-full rounded border bg-background/50 p-2 text-sm"
-                  value={form.backsound}
-                  onChange={(e) =>
-                    handleSoundChange("backsound", e.target.value)
-                  }
-                >
-                  {BACKSOUND_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
+            <div className="flex justify-end w-full">
+              <Button
+                size="sm"
+                variant="default"
+                onClick={handleReset}
+                className="bg-red-500"
+              >
+                Reset All
+              </Button>
+            </div>
           </div>
-          <div className="flex justify-end w-full">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={handleReset}
-              className="bg-red-500"
-            >
-              Reset All
-            </Button>
-          </div>
-        </div>
+        </ScrollArea>
       </DialogContent>
       {/* Nested Color Picker Dialog */}
       <ShadDialog open={isColorPickerOpen} onOpenChange={closeColorPicker}>

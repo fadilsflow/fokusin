@@ -1,3 +1,4 @@
+"use client";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ export function KeyboardShortcuts() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" className="text-background">
+        <Button variant="outline" size="icon">
           <Keyboard className="h-5 w-5" />
         </Button>
       </DialogTrigger>

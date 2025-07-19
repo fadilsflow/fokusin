@@ -1,3 +1,4 @@
+"use client";
 import { SettingsDialog } from "@/components/feature/settings-dialog";
 import { StatsDialog } from "@/components/feature/stats-dialog";
 import { ProgressTimer } from "@/components/feature/progres-timer";
@@ -9,36 +10,39 @@ import {
   SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
-import { createOrUpdateProfile } from "@/app/actions/profile";
-import { Suspense } from "react";
+import { Button } from "../ui/button";
+import Link from "next/link";
+import { useTimerBackground } from "@/lib/hooks/use-timer-background";
 
-async function ProfileInitializer() {
-  await createOrUpdateProfile();
-  return null;
-}
+export default function Header() {
+  const backgroundColor = useTimerBackground();
 
-export default async function Header() {
   return (
-    <nav className="fixed max-w-xl mx-auto top-0 left-0 right-0 z-50  items-center py-5 px-5 flex flex-col gap-3">
-      <div className="justify-between flex w-full">
-        <h1 className="text-2xl font-bold text-background">Focus</h1>
-        <div className="flex items-center gap-2">
-          <SignedIn>
-            <Suspense fallback={null}>
-              <ProfileInitializer />
-            </Suspense>
-            <SettingsDialog />
-            <KeyboardShortcuts />
-            <UserButton />
-            <StatsDialog />
-          </SignedIn>
-          <SignedOut>
-            <SignInButton mode="modal" />
-            <SignUpButton mode="modal" />
-          </SignedOut>
+    <nav style={{ backgroundColor }}>
+      <div className="max-w-xl mx-auto top-0 left-0 right-0 z-50 items-center py-5 px-5 flex flex-col gap-3">
+        <div className="justify-between flex w-full">
+          <Link href="/">
+            <h1 className="text-2xl font-bold text-background">Fokusin</h1>
+          </Link>
+          <div className="flex items-center gap-2">
+            <SignedIn>
+              <SettingsDialog />
+              <KeyboardShortcuts />
+              <UserButton />
+              <StatsDialog />
+            </SignedIn>
+            <SignedOut>
+              <Button variant="default" asChild>
+                <SignInButton mode="modal" />
+              </Button>
+              <Button variant="default" asChild>
+                <SignUpButton mode="modal" />
+              </Button>
+            </SignedOut>
+          </div>
         </div>
+        <ProgressTimer />
       </div>
-      <ProgressTimer />
     </nav>
   );
 }

@@ -110,3 +110,8 @@ export const useTimerStore = create<TimerState>()(
     }
   )
 );
+
+export const getBackgroundColor = () => {
+  const { settings } = useTimerStore.getState();
+  return settings.pomodoroColor;
+};

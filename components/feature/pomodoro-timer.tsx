@@ -1,6 +1,6 @@
 "use client";
 // src/components/pomodoro-timer.tsx
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +10,8 @@ import { formatTime } from "@/lib/utils";
 import type { TimerMode } from "@/lib/store/timer";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import Footer from "../layout/footer";
+import { useTimerBackground } from "@/lib/hooks/use-timer-background";
 
 export function PomodoroTimer() {
   const {
@@ -19,9 +21,9 @@ export function PomodoroTimer() {
     setMode,
     toggleTimer,
     settings,
-    completedPomodoros,
     incrementCompletedPomodoros,
   } = useTimerStore();
+  const backgroundColor = useTimerBackground();
   const hasSentFocusTime = useRef(false);
   const router = useRouter();
   const { userId } = useAuth();
@@ -45,6 +47,61 @@ export function PomodoroTimer() {
         return settings.pomodoroColor;
     }
   };
+
+  // Play button press sound
+  const playButtonSound = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const audio = new Audio("sounds/button-press.wav");
+      audio.volume = settings.volume ?? 1;
+      audio.play().catch(() => {});
+      // Cleanup after playing
+      audio.onended = () => audio.remove();
+    }
+  }, [settings.volume]);
+
+  // Play alarm sound
+  const playAlarm = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const alarmFile = settings.alarmSound || "alarm-bell.mp3";
+      if (!alarmFile) return;
+
+      // Clear any existing alarm
+      if (alarmRef.current) {
+        alarmRef.current.pause();
+        alarmRef.current.src = "";
+      }
+
+      alarmRef.current = new Audio(`sounds/alarm/${alarmFile}`);
+      alarmRef.current.volume = settings.volume ?? 1;
+      alarmRepeatCountRef.current = 0;
+
+      const playNextAlarm = () => {
+        if (alarmRepeatCountRef.current < (settings.alarmRepeat || 1)) {
+          alarmRepeatCountRef.current++;
+          if (alarmRef.current) {
+            alarmRef.current.currentTime = 0;
+            alarmRef.current.play().catch(() => {});
+          }
+        } else {
+          // Cleanup after all repeats are done
+          if (alarmRef.current) {
+            alarmRef.current.src = "";
+            alarmRef.current = null;
+          }
+        }
+      };
+
+      if (alarmRef.current) {
+        alarmRef.current.addEventListener("ended", () => {
+          if (alarmRepeatCountRef.current < (settings.alarmRepeat || 1)) {
+            playNextAlarm();
+          }
+        });
+
+        playNextAlarm();
+      }
+    }
+  }, [settings.alarmSound, settings.volume, settings.alarmRepeat]);
 
   // Play/pause backsound logic
   useEffect(() => {
@@ -97,7 +154,7 @@ export function PomodoroTimer() {
       playAlarm();
     }
     prevTimeLeft.current = timeLeft;
-  }, [timeLeft, mode]);
+  }, [timeLeft, mode, playAlarm]);
 
   // Cleanup alarm on unmount
   useEffect(() => {
@@ -115,60 +172,11 @@ export function PomodoroTimer() {
     };
   }, []);
 
-  // Play button press sound
-  const playButtonSound = () => {
-    if (typeof window !== "undefined") {
-      const audio = new Audio("sounds/button-press.wav");
-      audio.volume = settings.volume ?? 1;
-      audio.play().catch(() => {});
-      // Cleanup after playing
-      audio.onended = () => audio.remove();
-    }
-  };
-
-  // Play alarm sound
-  const playAlarm = () => {
-    if (typeof window !== "undefined") {
-      const alarmFile = settings.alarmSound || "alarm-bell.mp3";
-      if (!alarmFile) return;
-
-      // Clear any existing alarm
-      if (alarmRef.current) {
-        alarmRef.current.pause();
-        alarmRef.current.src = "";
-      }
-
-      alarmRef.current = new Audio(`sounds/alarm/${alarmFile}`);
-      alarmRef.current.volume = settings.volume ?? 1;
-      alarmRepeatCountRef.current = 0;
-
-      const playNextAlarm = () => {
-        if (alarmRepeatCountRef.current < (settings.alarmRepeat || 1)) {
-          alarmRepeatCountRef.current++;
-          if (alarmRef.current) {
-            alarmRef.current.currentTime = 0;
-            alarmRef.current.play().catch(() => {});
-          }
-        } else {
-          // Cleanup after all repeats are done
-          if (alarmRef.current) {
-            alarmRef.current.src = "";
-            alarmRef.current = null;
-          }
-        }
-      };
-
-      if (alarmRef.current) {
-        alarmRef.current.addEventListener("ended", () => {
-          if (alarmRepeatCountRef.current < (settings.alarmRepeat || 1)) {
-            playNextAlarm();
-          }
-        });
-
-        playNextAlarm();
-      }
-    }
-  };
+  // Handler for Start/Pause button
+  const handleToggleTimer = useCallback(() => {
+    playButtonSound();
+    toggleTimer();
+  }, [playButtonSound, toggleTimer]);
 
   const handleSkip = async () => {
     // Try to save focus time if user is logged in
@@ -291,12 +299,6 @@ export function PomodoroTimer() {
     }
   }, [mode, timeLeft, settings.pomodoroTime]);
 
-  // Handler for Start/Pause button
-  const handleToggleTimer = () => {
-    playButtonSound();
-    toggleTimer();
-  };
-
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -330,24 +332,24 @@ export function PomodoroTimer() {
   }, [handleToggleTimer, setMode]);
 
   return (
-    <div className="flex flex-col items-center justify-center ">
+    <div className="flex flex-col items-center   " style={{ backgroundColor }}>
       {/* Hidden audio element for backsound */}
       <audio ref={backsoundRef} preload="auto" />
-      <div className=" pb-8 pt-6 rounded-sm  bg-background/10  w-[95%] lg:w-md mt-25">
+      <div className=" pb-8  rounded-sm  w-[95%] lg:w-md mt-10 ">
         <Tabs
           defaultValue="pomodoro"
           value={mode}
           onValueChange={(value) => setMode(value as TimerMode)}
           className="mb-6"
         >
-          <TabsList className="grid grid-cols-3 w-fit mx-auto  bg-transparent  ">
-            <TabsTrigger value="pomodoro" className=" rounded-sm  ">
+          <TabsList className="grid grid-cols-3 w-fit mx-auto    bg-transparent">
+            <TabsTrigger value="pomodoro" className="  border-0   ">
               Pomodoros
             </TabsTrigger>
-            <TabsTrigger value="shortBreak" className="rounded-sm  ">
+            <TabsTrigger value="shortBreak" className=" border-0  ">
               Short Break
             </TabsTrigger>
-            <TabsTrigger value="longBreak" className="rounded-sm  ">
+            <TabsTrigger value="longBreak" className=" border-0  ">
               Long Break
             </TabsTrigger>
           </TabsList>
@@ -357,7 +359,7 @@ export function PomodoroTimer() {
         </Tabs>
 
         <div className="text-center mb-8">
-          <span className="text-9xl font-sans font-semibold text-background ">
+          <span className="text-9xl font-sans font-semibold text-primary ">
             {formatTime(timeLeft)}
           </span>
         </div>
@@ -367,20 +369,21 @@ export function PomodoroTimer() {
             <Button
               onClick={handleToggleTimer}
               variant="default"
-              className={`px-16 py-7 text-2xl bg-background hover:bg-background/90 text-foreground rounded-sm text-lg font-bold
-            transition-all duration-75 ease-in-out
-            shadow-[0_8px_0_0_rgba(255,255,255,255),0_0_0_2px_rgba(255,255,255,0.1)]
-            active:shadow-[0_0_0_0_rgba(255,255,255,0.2),0_0_0_2px_rgba(255,255,255,0.1)]
-            active:translate-y-2
-            ${
-              isRunning
-                ? "translate-y-2 shadow-[0_0_0_0_rgba(255,255,255,0.2),0_0_0_2px_rgba(255,255,255,0.1)]"
-                : ""
-            }`}
+              className={`px-16 py-7 bg-primary hover:bg-primary/90 rounded-sm text-lg font-bold
+              transition-all duration-75 ease-in-out
+              shadow-[0_8px_0_0_rgba(255,255,255,0.2),0_0_0_2px_rgba(255,255,255,0.05)]
+              active:shadow-[0_0_0_0_rgba(255,255,255,0.1),0_0_0_2px_rgba(255,255,255,0.05)]
+              active:translate-y-2
+              ${
+                isRunning
+                  ? "translate-y-2 shadow-[0_0_0_0_rgba(255,255,255,0.1),0_0_0_2px_rgba(255,255,255,0.05)]"
+                  : ""
+              }`}
               style={{ color: getBackgroundColor() }}
             >
               {isRunning ? "PAUSE" : "START"}
             </Button>
+
             <div
               className={`
                   absolute -right-20 top-[60%] -translate-y-1/2
@@ -393,12 +396,15 @@ export function PomodoroTimer() {
                 `}
             >
               <SkipForward
-                className="h-8 w-8 text-background rounded-full cursor-pointer"
+                className="h-8 w-8  cursor-pointer text-foreground"
                 onClick={handleSkip}
               />
             </div>
           </div>
         </div>
+      </div>
+      <div className="pt-32 pb-10 ">
+        <Footer />
       </div>
     </div>
   );

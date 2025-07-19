@@ -96,7 +96,7 @@ const StatsSkeleton = () => (
 
 const RankingSkeleton = () => (
   <div className="space-y-4">
-    {[...Array(12)].map((_, i) => (
+    {[...Array(5)].map((_, i) => (
       <div
         key={i}
         className="flex items-center gap-4 p-4 rounded-lg bg-background/5"
@@ -256,7 +256,7 @@ export function StatsDialog() {
                 </div>
               ) : rankingsData?.users && rankingsData.users.length > 0 ? (
                 <>
-                  <ScrollArea className="h-[600px] pr-4">
+                  <ScrollArea className="h-[350px] pr-4">
                     <div className="space-y-4">
                       {rankingsData.users.map((user, index) => (
                         <div
