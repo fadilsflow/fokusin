@@ -39,7 +39,7 @@ const defaultSettings: Settings = {
   autoStartBreaks: false,
   autoStartPomodoros: false,
   longBreakInterval: 4,
-  pomodoroColor: "oklch(0.3635 0.0554 277.8)",
+  pomodoroColor: "oklch(0.5425 0.1342 23.73)",
   shortBreakColor: "oklch(0.5406 0.067 196.69)",
   longBreakColor: "oklch(0.4703 0.0888 247.87)",
   volume: 1,

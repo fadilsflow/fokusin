@@ -2,7 +2,7 @@ export default function Footer() {
   return (
     <footer className="text-center text-sm ">
       <p>
-        <span className="font-bold">Fokusin</span> by{" "}
+        <span className="font-bold font-fredoka">Jeda</span> by{" "}
         <a
           href="https://fadils.xyz"
           className="underline"

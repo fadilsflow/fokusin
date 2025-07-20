@@ -1,24 +1,24 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fredoka } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
-import Header from "@/components/layout/header";
 import { QueryProvider } from "@/components/providers";
 import { createOrUpdateProfile } from "./actions/profile";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const fredoka = Fredoka({
+  variable: "--font-fredoka",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["300", "400", "500"],
 });
 
 export const metadata: Metadata = {
-  title: "Pomodoro Timer",
+  title: "Jeda",
   description: "A pomodoro timer to help you focus and get things done.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 async function ProfileInitializer() {
@@ -33,12 +33,9 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
+        <body className={`${fredoka.variable} antialiased`}>
           <QueryProvider>
             <ProfileInitializer />
-            <Header />
             <main className="dark bg-background text-foreground ">
               {children}
             </main>

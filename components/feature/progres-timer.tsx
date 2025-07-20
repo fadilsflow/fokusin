@@ -23,7 +23,7 @@ export function ProgressTimer() {
   return (
     <div
       aria-label="Pomodoro progress bar"
-      className="w-full h-0.5 bg-background/10  overflow-hidden shadow-inner"
+      className="w-full h-0.5 bg-foreground/10  overflow-hidden shadow-inner rounded-full"
       role="progressbar"
       aria-valuenow={Math.round(progress * 100)}
       aria-valuemin={0}
@@ -31,7 +31,7 @@ export function ProgressTimer() {
     >
       <div
         className={`h-full transition-all duration-300 ${
-          isRunning ? "bg-background" : "bg-background/20"
+          isRunning ? "bg-foreground" : "bg-foreground/20"
         }`}
         style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
       />

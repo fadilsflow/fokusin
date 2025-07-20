@@ -343,10 +343,10 @@ export function PomodoroTimer() {
           className="mb-6"
         >
           <TabsList className="grid grid-cols-3 w-fit mx-auto    bg-transparent">
-            <TabsTrigger value="pomodoro" className="  border-0   ">
+            <TabsTrigger value="pomodoro" className="  border-0 font-fredoka   ">
               Pomodoros
             </TabsTrigger>
-            <TabsTrigger value="shortBreak" className=" border-0  ">
+            <TabsTrigger value="shortBreak" className=" border-0 font-fredoka  ">
               Short Break
             </TabsTrigger>
             <TabsTrigger value="longBreak" className=" border-0  ">
@@ -359,7 +359,7 @@ export function PomodoroTimer() {
         </Tabs>
 
         <div className="text-center mb-8">
-          <span className="text-9xl font-sans font-semibold text-primary ">
+          <span className="text-9xl font-fredoka font-semibold text-primary ">
             {formatTime(timeLeft)}
           </span>
         </div>

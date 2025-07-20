@@ -25,6 +25,7 @@ import { useAuth } from "@clerk/nextjs";
 import { ScrollArea } from "../ui/scroll-area";
 
 const COLOR_OPTIONS = [
+  { name: "Brick Red", value: "oklch(0.5425 0.1342 23.73)" },
   { name: "Deep Indigo", value: "oklch(0.3635 0.0554 277.8)" },
   { name: "Teal", value: "oklch(0.5406 0.067 196.69)" },
   { name: "Steel Blue", value: "oklch(0.4703 0.0888 247.87)" },
@@ -33,7 +34,6 @@ const COLOR_OPTIONS = [
   { name: "Muted Magenta", value: "oklch(0.5297 0.1356 343.24)" },
   { name: "Forest Green", value: "oklch(0.5275 0.0713 151.27)" },
   { name: "Slate Gray", value: "oklch(0.2953 0.0196 278.09)" },
-  { name: "Brick Red", value: "oklch(0.5425 0.1342 23.73)" },
   { name: "Black", value: "oklch(0.0000 0.0000 0.0000)" },
 ];
 
@@ -44,7 +44,7 @@ const DEFAULTS = {
   longBreakInterval: 4,
   autoStartBreaks: false,
   autoStartPomodoros: false,
-  pomodoroColor: "oklch(0.3635 0.0554 277.8)",
+  pomodoroColor: "oklch(0.5425 0.1342 23.73)",
   shortBreakColor: "oklch(0.5406 0.067 196.69)",
   longBreakColor: "oklch(0.4703 0.0888 247.87)",
   volume: 1,
